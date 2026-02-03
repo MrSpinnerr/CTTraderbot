@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Forex Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg: #1a1a2e;
+            --tg-theme-text: #ffffff;
+            --tg-theme-button: #4CAF50;
+            --tg-theme-secondary: #16213e;
+        }
+        
+        body {
+            background: var(--tg-theme-bg);
+            color: var(--tg-theme-text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--tg-theme-secondary);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            border-top: 1px solid #333;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #888;
+            cursor: pointer;
+        }
+        
+        .nav-item.active {
+            color: #4CAF50;
+        }
+        
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 4px;
+        }
+        
+        .card {
+            background: var(--tg-theme-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px;
+        }
+        
+        .btn {
+            background: var(--tg-theme-button);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin: 4px 0;
+        }
+        
+        .btn-buy {
+            background: #4CAF50;
+        }
+        
+        .btn-sell {
+            background: #F44336;
+        }
+        
+        .btn-close {
+            background: #FF9800;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .trade-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .trade-row:last-child {
+            border-bottom: none;
+        }
+        
+        .trade-id {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .trade-pair {
+            font-weight: 600;
+        }
+        
+        .trade-direction {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .direction-buy {
+            background: #4CAF50;
+        }
+        
+        .direction-sell {
+            background: #F44336;
+        }
+        
+        .pnl-positive {
+            color: #4CAF50;
+        }
+        
+        .pnl-negative {
+            color: #F44336;
+        }
+        
+        .content {
+            padding-bottom: 80px;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 16px;
+        }
+        
+        .price-input {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab-btn.active {
+            color: #4CAF50;
+            border-bottom-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        {% if page == 'dashboard' %}
+        <!-- DASHBOARD -->
+        <div class="card">
+            <div class="grid-2">
+                <div class="stat-card">
+                    <div class="stat-value" id="balance">${{ "%.2f"|format(stats.balance) }}</div>
+                    <div class="stat-label">Balance</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pnl">{{ "%.2f"|format(stats.total_pnl) }}</div>
+                    <div class="stat-label">Total P&L</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.win_rate }}%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.wins }}/{{ stats.losses }}</div>
+                    <div class="stat-label">Wins/Losses</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 class="text-lg font-bold mb-4">Quick Trade</h3>
+            <select id="pairSelect" class="price-input mb-4">
+                <option value="EUR/USD">EUR/USD</option>
+                <option value="GBP/USD">GBP/USD</option>
+                <option value="USD/JPY">USD/JPY</option>
+                <option value="AUD/USD">AUD/USD</option>
+                <option value="USD/CAD">USD/CAD</option>
+            </select>
+            <input type="number" id="priceInput" class="price-input mb-4" placeholder="Entry Price" step="0.0001">
+            <div class="grid-2">
+                <button class="btn btn-buy" onclick="openTrade('BUY')">🟢 BUY</button>
+                <button class="btn btn-sell" onclick="openTrade('SELL')">🔴 SELL</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 class="text-lg font-bold mb-4">Open Trades ({{ stats.open_trades }})</h3>
+            <div id="openTradesList">
+                {% for trade in stats.trades %}
+                {% if trade.status == 'OPEN' %}
+                <div class="trade-row">
+                    <div>
+                        <div class="trade-id">{{ trade.id }}</div>
+                        <div class="trade-pair">{{ trade.pair }}</div>
+                        <span class="trade-direction direction-{{ trade.direction.lower() }}">{{ trade.direction }}</span>
+                    </div>
+                    <div>
+                        <span class="trade-id">{{ trade.entry_time[11:16] }}</span>
+                        <button class="btn btn-close" style="width:auto;padding:8px 16px;margin-left:8px;" onclick="closeTrade('{{ trade.id }}')">Close</button>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        
+        {% elif page == 'trades' %}
+        <!-- TRADES HISTORY -->
+        <div class="card">
+            <h3 class="text-lg font-bold mb-4">Recent Trades</h3>
+            <div class="grid-2" style="margin-bottom: 16px;">
+                <button class="tab-btn active" onclick="filterTrades('all', this)">All</button>
+                <button class="tab-btn" onclick="filterTrades('WIN', this)">Wins</button>
+            </div>
+            <div id="tradesList">
+                {% for trade in stats.trades|reverse %}
+                <div class="trade-row">
+                    <div>
+                        <div class="trade-id">{{ trade.id }} - {{ trade.entry_time[11:16] }}</div>
+                        <div class="trade-pair">{{ trade.pair }}</div>
+                        <span class="trade-direction direction-{{ trade.direction.lower() }}">{{ trade.direction }}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="trade-id">{{ trade.entry_price }} → {{ trade.exit_price or '---' }}</div>
+                        <div class="{{ 'pnl-positive' if trade.pnl > 0 else 'pnl-negative' }}">
+                            {{ '+' if trade.pnl > 0 else '' }}{{ trade.pnl }} pips
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        {% elif page == 'analysis' %}
+        <!-- ANALYSIS -->
+        <div class="card">
+            <h3 class="text-lg font-bold mb-4">Live Analysis</h3>
+            <p style="color:#888;text-align:center;padding:20px;">
+                Chart analysis coming soon...
+            </p>
+            <canvas id="chartCanvas" width="400" height="200"></canvas>
+        </div>
+        
+        {% elif page == 'settings' %}
+        <!-- SETTINGS -->
+        <div class="card">
+            <h3 class="text-lg font-bold mb-4">Settings</h3>
+            <button class="btn" onclick="resetJournal()" style="background:#F44336;">🗑️ Reset Journal</button>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- BOTTOM NAVIGATION -->
+    <div class="bottom-nav">
+        <div class="nav-item {% if page == 'dashboard' %}active{% endif %}" onclick="goTo('dashboard')">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+            <span>Trade</span>
+        </div>
+        <div class="nav-item {% if page == 'trades' %}active{% endif %}" onclick="goTo('trades')">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+            <span>History</span>
+        </div>
+        <div class="nav-item {% if page == 'analysis' %}active{% endif %}" onclick="goTo('analysis')">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+            <span>Analysis</span>
+        </div>
+        <div class="nav-item {% if page == 'settings' %}active{% endif %}" onclick="goTo('settings')">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            <span>Settings</span>
+        </div>
+    </div>
+    
+    <script>
+        // Navigation
+        function goTo(page) {
+            window.location.href = '/' + page;
+        }
+        
+        // API calls
+        async function fetchStats() {
+            const response = await fetch('/api/stats');
+            return await response.json();
+        }
+        
+        async function openTrade(direction) {
+            const pair = document.getElementById('pairSelect').value;
+            const price = document.getElementById('priceInput').value;
+            
+            if (!price) {
+                alert('Please enter price');
+                return;
+            }
+            
+            const response = await fetch('/api/open_trade', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    pair: pair,
+                    direction: direction,
+                    price: price
+                })
+            });
+            
+            if (response.ok) {
+                location.reload();
+            }
+        }
+        
+        async function closeTrade(tradeId) {
+            const pair = document.getElementById('pairSelect').value;
+            const price = document.getElementById('priceInput').value || 1.0;
+            
+            const response = await fetch('/api/close_trade/' + tradeId, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({price: price})
+            });
+            
+            if (response.ok) {
+                location.reload();
+            }
+        }
+        
+        function resetJournal() {
+            if (confirm('Reset all trades? This cannot be undone.')) {
+                fetch('/api/reset', {method: 'POST'})
+                    .then(r => r.ok && location.reload());
+            }
+        }
+        
+        function filterTrades(filter, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Add filtering logic here
+        }
+        
+        // Refresh stats every 30 seconds
+        setInterval(async () => {
+            try {
+                const stats = await fetchStats();
+                document.getElementById('balance').textContent = '$' + stats.balance.toFixed(2);
+            } catch (e) {
+                console.log('Refresh failed');
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
